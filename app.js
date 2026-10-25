@@ -2,15 +2,16 @@
 const http = require("http");
 
 let orders = [];
+let nextId = 1;
 
 const page = `
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Order System V2</title>
+    <title>Order System V3</title>
 </head>
 <body>
-    <h1>Order System - Version 2</h1>
+    <h1>Order System - Version 3</h1>
 
     <h2>Place Order</h2>
     <form action="/order" method="GET">
@@ -21,7 +22,7 @@ const page = `
     <h2>View Orders</h2>
     <a href="/orders">View All Orders</a>
 
-    <p>Version 2 Features: Place Order and View Orders</p>
+    <p>Version 3 Features: Place, View and Cancel Orders</p>
 </body>
 </html>
 `;
@@ -32,25 +33,61 @@ const server = http.createServer((req, res) => {
     if (url.pathname === "/order") {
         const item = url.searchParams.get("item");
 
-        if (item) {
-            orders.push(item);
-            res.writeHead(200, { "Content-Type": "text/html" });
-            return res.end(`
-                <h1>Order placed successfully!</h1>
-                <p>Item: ${item}</p>
-                <a href="/">Back to Home</a>
-            `);
+        if (!item || !item.trim()) {
+            res.writeHead(400);
+            return res.end("Please enter an order name.");
         }
+
+        orders.push({ id: nextId++, item: item.trim() });
+
+        res.writeHead(200, { "Content-Type": "text/html" });
+        return res.end(`
+            <h1>Order placed successfully!</h1>
+            <p>Item: ${item.replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;",
+                '"': "&quot;", "'": "&#39;"
+            }[c]))}</p>
+            <a href="/">Back to Home</a> |
+            <a href="/orders">View Orders</a>
+        `);
     }
 
     if (url.pathname === "/orders") {
         res.writeHead(200, { "Content-Type": "text/html" });
+
+        const list = orders.map(order => `
+            <li>
+                ${order.item} (ID: ${order.id})
+                <form action="/cancel" method="GET" style="display:inline">
+                    <input type="hidden" name="id" value="${order.id}">
+                    <button type="submit">Cancel</button>
+                </form>
+            </li>
+        `).join("");
+
         return res.end(`
-            <h1>All Orders - Version 2</h1>
-            ${orders.length
-                ? "<ul>" + orders.map(item => `<li>${item}</li>`).join("") + "</ul>"
-                : "<p>No orders yet.</p>"}
+            <h1>All Orders - Version 3</h1>
+            ${list ? `<ul>${list}</ul>` : "<p>No orders yet.</p>"}
             <a href="/">Back to Home</a>
+        `);
+    }
+
+    if (url.pathname === "/cancel") {
+        const id = Number(url.searchParams.get("id"));
+        const index = orders.findIndex(order => order.id === id);
+
+        if (index === -1) {
+            res.writeHead(404, { "Content-Type": "text/html" });
+            return res.end('<p>Order not found.</p><a href="/orders">Back</a>');
+        }
+
+        const removed = orders.splice(index, 1)[0];
+
+        res.writeHead(200, { "Content-Type": "text/html" });
+        return res.end(`
+            <h1>Order cancelled successfully!</h1>
+            <p>Cancelled: ${removed.item}</p>
+            <a href="/orders">View Remaining Orders</a>
         `);
     }
 
@@ -58,6 +95,6 @@ const server = http.createServer((req, res) => {
     res.end(page);
 });
 
-server.listen(3000, () => {
-    console.log("Order System V2 running at http://localhost:3000");
+server.listen(3003, () => {
+    console.log("Order System V3 running at http://localhost:3003");
 });
